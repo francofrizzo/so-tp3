@@ -1,6 +1,10 @@
 #ifndef	_ELECCION_H
 #define	_ELECCION_H
 
+#define TAG_ELECCION_TOKEN 20
+#define TAG_ELECCION_ACK   10
+#define ACK_TIMEOUT        1
+
 /* Enumerado para ver si soy o no líder. */
 enum status { NO_LIDER, LIDER };
 typedef enum status t_status;
