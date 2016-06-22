@@ -16,11 +16,12 @@ static t_pid siguiente_pid(t_pid pid, int es_ultimo){
 void iniciar_eleccion(t_pid pid, int es_ultimo){
 	MPI_Request req;
 
-	t_pid token[4];
+	t_pid token[2];
 	token[0] = pid;
 	token[1] = pid;
-	token[2] = pid;
-	token[3] = 0;
+	// DEBUG
+	// token[2] = pid;
+	// token[3] = 0;
 
 	t_pid siguiente = siguiente_pid(pid, es_ultimo);
 	int ack_flag = 0;
@@ -28,7 +29,7 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 	// Mientras no haya recibido un ACK
 	while (! ack_flag) {
 		// Intento enviar a mi siguiente
-		MPI_Isend(&token, 4, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
+		MPI_Isend(&token, 2, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
 		          MPI_COMM_WORLD, &req);
 
 		// Si no soy yo mismo, espero al ACK
@@ -48,7 +49,8 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 			ack_flag = 1;
 		}
 
-		printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
+		// DEBUG
+		// printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
 
 		// Aumento el valor de siguiente para enviarle al próximo
 		siguiente++;
@@ -71,7 +73,7 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 	MPI_Status ack_status;
 
 	MPI_Request req;
-	t_pid token[4];
+	t_pid token[2];
 
 	// Repito hasta que haya un líder
 	while (ahora < tiempo_maximo){
@@ -82,7 +84,7 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 		// Si llegó un mensaje nuevo lo cargo en token
 		if (token_flag) {
 			// Leo el mensaje recibido
-			MPI_Irecv(&token, 4, MPI_PID, MPI_ANY_SOURCE, TAG_ELECCION_TOKEN,
+			MPI_Irecv(&token, 2, MPI_PID, MPI_ANY_SOURCE, TAG_ELECCION_TOKEN,
 			          MPI_COMM_WORLD, &req);
 
 			// Tomo el pid del emisor y le envío ACK
@@ -109,12 +111,13 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 					// Me denomino como nuevo candidato
 					token[1] = pid;
 				}
-				token[3]++;
+				// DEBUG
+				// token[3]++;
 
 				// Mientras no haya recibido un ACK
-				while (! ack_flag) {
+				while (! ack_flag && status != LIDER) {
 					// Envío el nuevo token al siguiente
-					MPI_Isend(&token, 4, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
+					MPI_Isend(&token, 2, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
 					          MPI_COMM_WORLD, &req);
 
 					ahora_ack = MPI_Wtime();
@@ -128,7 +131,8 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 						ahora_ack = MPI_Wtime();
 					}
 
-					printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
+					// DEBUG
+					// printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
 
 					// Si no recib. ACK, intento con el próximo
 					if (! ack_flag) {
