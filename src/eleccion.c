@@ -21,23 +21,33 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 	token[1] = pid;
 	token[2] = pid;
 	token[3] = 0;
-	
+
 	t_pid siguiente = siguiente_pid(pid, es_ultimo);
-
-	MPI_Isend(&token, 4, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
-		MPI_COMM_WORLD, &req);
-
-	double ahora = MPI_Wtime();
-	double tiempo_maximo = ahora + ACK_TIMEOUT;
-
 	int ack_flag = 0;
-	MPI_Status ack_status;
-	while (! ack_flag && ahora < tiempo_maximo) {
-		MPI_Iprobe(siguiente, TAG_ELECCION_ACK, MPI_COMM_WORLD,
-			&ack_flag, &ack_status);
-		ahora = MPI_Wtime();
+
+	while (! ack_flag) {
+		MPI_Isend(&token, 4, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
+			MPI_COMM_WORLD, &req);
+
+		if (siguiente != pid) {
+			double ahora = MPI_Wtime();
+			double tiempo_maximo = ahora + ACK_TIMEOUT;
+
+			MPI_Status ack_status;
+			while (! ack_flag && ahora < tiempo_maximo) {
+				MPI_Iprobe(siguiente, TAG_ELECCION_ACK, MPI_COMM_WORLD,
+					&ack_flag, &ack_status);
+				ahora = MPI_Wtime();
+			}
+		}
+		else {
+			ack_flag = 1;
+		}
+
+		printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
+
+		siguiente++;
 	}
-	printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
 }
 
 void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
@@ -58,7 +68,7 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 	MPI_Request req;
 	t_pid token[4];
 
-	// Repito hasta qye haya un líder
+	// Repito hasta que haya un líder
 	while (ahora < tiempo_maximo){
 		// Reviso si llegó un mensaje nuevo
 		MPI_Iprobe(MPI_ANY_SOURCE, TAG_ELECCION_TOKEN, MPI_COMM_WORLD,
@@ -75,41 +85,49 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 			MPI_Isend(&token_flag, 1, MPI_PID, ack_pid, TAG_ELECCION_ACK,
 			          MPI_COMM_WORLD, &req);
 
-			// Si llegó un mensaje en el cual soy el inciador
-			if (token[0] == pid) {
-				// Si yo sigo siendo el candidato
-				if (token[1] == pid) {
-					// Soy líder
-					status = LIDER;
-					break;
+			if (status != LIDER) {
+				// Si llegó un mensaje en el cual soy el iniciador
+				if (token[0] == pid) {
+					// Si yo sigo siendo el candidato
+					if (token[1] == pid) {
+						// Soy líder
+						status = LIDER;
+					}
+					else {
+						// Reemplazo al iniciador por el candidato actual
+						token[0] = token[1];
+					}
 				}
-				else {
-					// Reemplazo al inciciador por el candidato actual
-					token[0] = token[1];
+				// Si no soy el iniciador pero tengo un pid mayor al del candidato
+				else if(token[0] != pid && token[1] < pid) {
+					// Me denomino como nuevo candidato
+					token[1] = pid;
 				}
+				token[3]++;
 			}
-			// Si no soy el iniciador pero tengo un pid mayor al del candidato
-			else if(token[0] != pid && token[1] < pid) {
-				// Me denomino como nuevo candidato
-				token[1] = pid;
-			}
-			token[3]++;
 
-			// Envío el nuevo token al próximo
-			MPI_Isend(&token, 4, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
-			          MPI_COMM_WORLD, &req);
+			while (! ack_flag && status != LIDER) {
+				// Envío el nuevo token al siguiente
+				MPI_Isend(&token, 4, MPI_PID, siguiente, TAG_ELECCION_TOKEN,
+				          MPI_COMM_WORLD, &req);
 
-			ahora_ack = MPI_Wtime();
-			tiempo_maximo_ack = ahora_ack + ACK_TIMEOUT;
-
-			// Espero el ACK
-			ack_flag = 0;
-			while (! ack_flag && ahora_ack < tiempo_maximo_ack) {
-				MPI_Iprobe(siguiente, TAG_ELECCION_ACK, MPI_COMM_WORLD,
-				           &ack_flag, &ack_status);
 				ahora_ack = MPI_Wtime();
+				tiempo_maximo_ack = ahora_ack + ACK_TIMEOUT;
+
+				// Espero el ACK
+				ack_flag = 0;
+				while (! ack_flag && ahora_ack < tiempo_maximo_ack) {
+					MPI_Iprobe(siguiente, TAG_ELECCION_ACK, MPI_COMM_WORLD,
+					           &ack_flag, &ack_status);
+					ahora_ack = MPI_Wtime();
+				}
+
+				printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
+
+				if (! ack_flag && siguiente < 5) {
+					siguiente++;
+				}
 			}
-			printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
 		}
 
 		/* Actualizo valor de la hora. */
