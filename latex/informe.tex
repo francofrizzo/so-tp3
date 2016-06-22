@@ -78,5 +78,73 @@
 \thispagestyle{empty}
 
 \newpage
+\tableofcontents
+
+\newpage
+\section{Introducción}
+
+Para este trabajo se requería completar el protocolo de elección de líder en un
+sistema distribuido con topología de anillo. El mismo debía poder ejecutarse
+teniendo nodos caídos por lo tanto era necesario además desarrollar algún
+mecanismo que resistiera bajas.
+
+El protocolo consiste en dos llamadas: \texttt{iniciar\_eleccion} y
+\texttt{eleccion\_lider}. A continuación se procede a explicar en detalle las
+implementaciones de cada una.
+
+\section{Inicio de elección}
+
+Los procesos $P_i$ encargados de iniciar una elección son seleccionados al azar. Los
+mismos tienen como tarea enviar un mensaje $(P_i, P_i)$ a su sucesor en el
+anillo donde le indican que iniciaron una elección postulándose como
+candidatos.
+
+Para lograr esto se utiliza \texttt{MPI\_Isend} para enviar el token descrito
+anteriormente al siguiente otorgado por la función \texttt{siguiente\_pid}.
+Como el próximo nodo podría estar caído, se debe esperar a recibir un
+\textsc{ACK} del destinatario. Esto se logra esperando a que
+\texttt{MPI\_Iprobe} detecte que llegó un mensaje con el tag
+\texttt{TAG\_ELECCION\_ACK} o que finalice el tiempo de espera. Si se detecta un
+\textsc{ACK} finaliza la rutina de inicio de elección, caso contrario es
+necesario reenviar el mensaje al próximo en el anillo. Para lograr esto, se
+aumenta en uno el valor obtenido por \texttt{siguiente\_pid}. Esto funciona por
+el hecho de que en el peor escenario se llega al último elemento que
+necesariamente va a estar vivo evitando así irse de rango.
+
+Cabe destacar que se contempla el escenario donde el iniciador de la elección es
+el único proceso vivo, en cuyo caso al enterarse que está enviándose un mensaje a
+si mismo no espera recibir un \textsc{ACK}.
+
+\section{Elección de líder}
+
+Todos los procesos ejecutan esta rutina. Aquí es donde se lleva a cabo el
+protocolo definido por el enunciado. Para satisfacer lo pedido se tiene un ciclo
+que se ejecuta hasta que se termine el tiempo máximo para la definición de
+líder.
+
+En el mismo se lleva a cabo el siguiente mecanismo. Primero se consulta mediante
+\texttt{MPI\_Iprobe} con tag \texttt{TAG\_ELECCION\_TOKEN} si se recibió
+un token. En caso de recibir un mensaje el mismo es leído con \texttt{MPI\_Irecv} donde
+luego tomando el valor del emisor mediante \texttt{status.MPI\_SOURCE} se le envía
+el respectivo \textsc{ACK}. Es entonces cuando se procede a analizar el token
+recibido y actuar en base a su valor.
+
+Si el proceso actual es el iniciador del mensaje recibido entonces existen dos
+posibilidades: el mismo sigue siendo el candidato o este tomó otro valor. Si
+sigue siendo el candidato entonces pasa a actualizar su estado a \texttt{LIDER},
+de otra forma remplaza al iniciador por el candidato actual.
+
+Si no es el iniciador pero tiene un número de \texttt{pid} mayor al del
+candidato actual, entonces lo remplaza por el suyo.
+
+Habiendo tomado la decisión correspondiente en función de los valores del token
+queda enviar el mensaje al siguiente nodo. Al igual que con la rutina
+\texttt{iniciar\_elección} es necesario esperar un \textsc{ACK} del destinatario
+para corroborar que el mismo no esté muerto. Nuevamente el procedimiento
+comienza enviando al \texttt{pid} señalado por \texttt{siguiente\_pid} mediante
+\texttt{MPI\_Isend}. Luego queda a la espera consultando con
+\texttt{MPI\_Iprobe} la llegada del \textsc{ACK}. Si finaliza el tiempo de
+espera sin haber recibido respuesta repite el procedimiento aumentando en uno el
+valor del \texttt{pid} destino.
 
 \end{document}
