@@ -54,6 +54,7 @@
 
 \newcommand{\ord}{\ensuremath{\operatorname{O}}}
 \newcommand{\nat}{\ensuremath{\mathbb{N}}}
+\newcommand{\acr}[1]{\textsc{\lowercase{#1}}}
 
 %\lstset{
 %    language=C++,
@@ -78,15 +79,13 @@
 \thispagestyle{empty}
 
 \newpage
-\tableofcontents
-
-\newpage
 \section{Introducción}
 
 Para este trabajo se requería completar el protocolo de elección de líder en un
-sistema distribuido con topología de anillo. El mismo debía poder ejecutarse
-teniendo nodos caídos por lo tanto era necesario además desarrollar algún
-mecanismo que resistiera bajas.
+sistema distribuido con topología de anillo, utilizando la implementación en
+\texttt{C} de \acr{MPI} (Message Passing Interface). El mismo debía poder
+ejecutarse teniendo nodos caídos; por lo tanto, era necesario además
+desarrollar algún mecanismo que resistiera bajas.
 
 El protocolo consiste en dos llamadas: \texttt{iniciar\_eleccion} y
 \texttt{eleccion\_lider}. A continuación se procede a explicar en detalle las
@@ -102,18 +101,18 @@ candidatos.
 Para lograr esto se utiliza \texttt{MPI\_Isend} para enviar el token descrito
 anteriormente al siguiente otorgado por la función \texttt{siguiente\_pid}.
 Como el próximo nodo podría estar caído, se debe esperar a recibir un
-\textsc{ACK} del destinatario. Esto se logra esperando a que
+\acr{ACK} del destinatario. Esto se logra esperando a que
 \texttt{MPI\_Iprobe} detecte que llegó un mensaje con el tag
 \texttt{TAG\_ELECCION\_ACK} o que finalice el tiempo de espera. Si se detecta un
-\textsc{ACK} finaliza la rutina de inicio de elección, caso contrario es
+\acr{ACK} finaliza la rutina de inicio de elección; en caso contrario, es
 necesario reenviar el mensaje al próximo en el anillo. Para lograr esto, se
 aumenta en uno el valor obtenido por \texttt{siguiente\_pid}. Esto funciona por
 el hecho de que en el peor escenario se llega al último elemento que
 necesariamente va a estar vivo evitando así irse de rango.
 
 Cabe destacar que se contempla el escenario donde el iniciador de la elección es
-el único proceso vivo, en cuyo caso al enterarse que está enviándose un mensaje a
-si mismo no espera recibir un \textsc{ACK}.
+el único proceso vivo, en cuyo caso al enterarse de que está enviándose un mensaje a
+sí mismo no espera recibir un \acr{ACK}.
 
 \section{Elección de líder}
 
@@ -125,8 +124,8 @@ líder.
 En el mismo se lleva a cabo el siguiente mecanismo. Primero se consulta mediante
 \texttt{MPI\_Iprobe} con tag \texttt{TAG\_ELECCION\_TOKEN} si se recibió
 un token. En caso de recibir un mensaje el mismo es leído con \texttt{MPI\_Irecv} donde
-luego tomando el valor del emisor mediante \texttt{status.MPI\_SOURCE} se le envía
-el respectivo \textsc{ACK}. Es entonces cuando se procede a analizar el token
+luego, tomando el valor del emisor mediante \texttt{status.MPI\_SOURCE}, se le envía
+el respectivo \acr{ACK}. Es entonces cuando se procede a analizar el token
 recibido y actuar en base a su valor.
 
 Si el proceso actual es el iniciador del mensaje recibido entonces existen dos
@@ -139,12 +138,74 @@ candidato actual, entonces lo remplaza por el suyo.
 
 Habiendo tomado la decisión correspondiente en función de los valores del token
 queda enviar el mensaje al siguiente nodo. Al igual que con la rutina
-\texttt{iniciar\_elección} es necesario esperar un \textsc{ACK} del destinatario
+\texttt{iniciar\_elección}, es necesario esperar un \acr{ACK} del destinatario
 para corroborar que el mismo no esté muerto. Nuevamente el procedimiento
 comienza enviando al \texttt{pid} señalado por \texttt{siguiente\_pid} mediante
 \texttt{MPI\_Isend}. Luego queda a la espera consultando con
-\texttt{MPI\_Iprobe} la llegada del \textsc{ACK}. Si finaliza el tiempo de
-espera sin haber recibido respuesta repite el procedimiento aumentando en uno el
-valor del \texttt{pid} destino.
+\texttt{MPI\_Iprobe} la llegada del \acr{ACK}. Si finaliza el tiempo de
+espera sin haber recibido respuesta, se repite el procedimiento aumentando en
+uno el valor del \texttt{pid} de destino.
+
+\section{Problemas encontrados}
+
+Finalizada la implementación del algoritmo, se procedió a testearlo con
+diferentes casos. Al hacer esto, se descubrió que, como consecuencia de la
+simplicidad con la que se implementó el protocolo de comunicación entre los
+procesos, aparecían inconvenientes en diversas instancias del problema. A
+continuación se describe un escenario problemático sencillo para ejemplificar
+los problemas detectados.
+
+Se considera un anillo donde solo hay dos procesos vivos, $P_1$ y $P_2$,
+teniendo $P_1$ un \texttt{pid} considerablemente mayor que $1$. Si tanto $P_1$
+como $P_2$ deciden iniciar una elección, podría pasar lo siguiente: $P_2$, que
+sabe que es el último proceso, intenta enviar el token al proceso con
+\texttt{pid} $1$, y queda esperando recibir un \acr{ACK}, que no llega porque
+el proceso en cuestión está muerto. Cuando se cumple el tiempo previsto por el
+protocolo, intenta con el proceso $2$, que también está muerto, y así
+sucesivamente. Mientras $P_2$ está ocupado esperando un \acr{ACK}, $P_1$
+intenta enviarle el token de su elección; $P_2$, que está ocupado esperando
+que un proceso posterior, no responde con un \acr{ACK} y $P_1$ piensa que está
+muerto, por lo que continúa con el protocolo con los procesos siguientes. Esto
+quiere decir que $P_1$ nunca obtendrá respuesta de $P_2$, por lo que esta
+elección se perderá. Peor aún, si el tiempo total de la etapa de elección es
+suficiente, podría pasar que $P_1$ intente enviar un mensaje a un proceso con
+un \texttt{pid} inexistente, provocando un error de \acr{MPI} que ocasiona el
+fin de la ejecución del programa.
+
+El problema expuesto es fácil de reproducir, ya que resulta relativamente
+sencillo encontrar instancias que provoquen situaciones similares. La
+principal causa de este comportamiento es el hecho de que durante la etapa de
+envío de un token, los procesos quedan haciendo \emph{busy waiting} hasta
+recibir el \acr{ACK} previsto por el protocolo, impidiendo que puedan
+responder mensajes enviados por otros procesos.
+
+\subsection{Posibles soluciones propuestas}
+
+Se estudiaron varias soluciones posibles a este inconveniente. Primero se
+pensó en alternar la espera de \acr{ACK} con el chequeo por la recepción de
+nuevos tokens. De esta forma, al recibir un token, se puede responder con un
+\acr{ACK} de forma inmediata. La complicación que surge de esto es que al
+recibir un nuevo token este debe pasarse al proceso siguiente, debiendo
+ahora esperar la recepción de un segundo \acr{ACK}. Esto se vuelve aún más
+complejo si se considera que pueden seguir acumulándose los mensajes
+recibidos, debiendo hacerse \emph{polling} por un número creciente de \acr
+{ACK}.
+
+Una solución alternativa es responder a los tokens recibidos con un \acr{ACK}
+de forma inmediata, pero retrasar el envío de estos tokens hasta que se haya
+recibido el \acr{ACK} por el cual se está esperando, evitando que se solapen
+las esperas por más de un \acr{ACK}. El problema de esta solución es que debe
+agregarse una estructura de datos (por ejemplo, una cola) para poder
+almacenar los tokens cuyo envío está pendiente. Además, puede demorar de forma
+considerable el progreso de la elección, provocando que el tiempo disponible
+se termine antes de que esta haya finalizado.
+
+Otra alternativa que se estudió, en una línea similar a la idea anterior, es
+la de responder con un \acr{ACK} de forma inmediata pero, en lugar de
+almacenar todos los tokens recibidos para su posterior envío, agregar lógica
+que permita seleccionar y enviar solo uno de ellos, de una forma que no altere
+el desarrollo de la elección de líder. Sin embargo, esta alternativa no solo
+presenta inconvenientes similares a los planteados para el caso anterior, sino
+que además requiere modificar el protocolo especificado de forma considerable.
 
 \end{document}
