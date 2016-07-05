@@ -3,12 +3,12 @@
 #include "eleccion.h"
 
 static t_pid siguiente_pid(t_pid pid, int es_ultimo){
-	t_pid res= 0; /* Para silenciar el warning del compilador. */
+	t_pid res = 0; /* Para silenciar el warning del compilador. */
 
 	if (es_ultimo)
-		res= 1;
+		res = 1;
 	else
-		res= pid+1;
+		res = pid + 1;
 
 	return res;
 }
@@ -75,6 +75,21 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 	MPI_Request req;
 	t_pid token[2];
 
+	// Consulto si hay mensajes en la cola
+	MPI_Iprobe(MPI_ANY_SOURCE, TAG_ELECCION_ACK, MPI_COMM_WORLD,
+	           &ack_flag, &ack_status);
+
+	// Si hay, entonces fui seleccionado para iniciar una elección y el próximo
+	// proceso vivo es el que me envío este ACK
+	if (ack_flag) {
+		siguiente = ack_status.MPI_SOURCE;
+		// Recibo para que sea desencolado
+		MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
+		          MPI_COMM_WORLD, &req);
+		ack_flag = 0;
+		token_flag = 0;
+	}
+
 	// Repito hasta que haya un líder
 	while (ahora < tiempo_maximo){
 		// Reviso si llegó un mensaje nuevo
@@ -124,7 +139,6 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 					tiempo_maximo_ack = ahora_ack + ACK_TIMEOUT;
 
 					// Espero el ACK
-					ack_flag = 0;
 					while (! ack_flag && ahora_ack < tiempo_maximo_ack) {
 						MPI_Iprobe(siguiente, TAG_ELECCION_ACK, MPI_COMM_WORLD,
 						           &ack_flag, &ack_status);
@@ -134,11 +148,19 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 					// DEBUG
 					// printf("[%hd, %hd] (%u -> %u) i:%hd  c:%hd\n", token[0], token[1], pid, siguiente, token[2], token[3]);
 
-					// Si no recib. ACK, intento con el próximo
+					// Si no recibí ACK, intento con el próximo
 					if (! ack_flag) {
 						siguiente++;
 					}
+					// Si llegó, entonces lo recibo para que sea desencolado
+					else {
+						MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
+								  MPI_COMM_WORLD, &req);
+					}
 				}
+				// Ambos flags son resetados para la siguiente iteración
+				token_flag = 0;
+				ack_flag = 0;
 			}
 		}
 
