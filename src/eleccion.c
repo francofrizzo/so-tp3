@@ -25,6 +25,7 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 
 	t_pid siguiente = siguiente_pid(pid, es_ultimo);
 	int ack_flag = 0;
+	int token_flag = 0;
 
 	// Mientras no haya recibido un ACK
 	while (! ack_flag) {
@@ -42,6 +43,11 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 				MPI_Iprobe(siguiente, TAG_ELECCION_ACK, MPI_COMM_WORLD,
 				           &ack_flag, &ack_status);
 				ahora = MPI_Wtime();
+			}
+
+			if (ack_flag) {
+				MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
+				          MPI_COMM_WORLD, &req);
 			}
 		}
 		// Si soy yo mismo no espero un ACK
@@ -75,20 +81,20 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 	MPI_Request req;
 	t_pid token[2];
 
-	// Consulto si hay mensajes en la cola
-	MPI_Iprobe(MPI_ANY_SOURCE, TAG_ELECCION_ACK, MPI_COMM_WORLD,
-	           &ack_flag, &ack_status);
+	// // Consulto si hay mensajes en la cola
+	// MPI_Iprobe(MPI_ANY_SOURCE, TAG_ELECCION_ACK, MPI_COMM_WORLD,
+	// 		   &ack_flag, &ack_status);
 
-	// Si hay, entonces fui seleccionado para iniciar una elección y el próximo
-	// proceso vivo es el que me envío este ACK
-	if (ack_flag) {
-		siguiente = ack_status.MPI_SOURCE;
-		// Recibo para que sea desencolado
-		MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
-		          MPI_COMM_WORLD, &req);
-		ack_flag = 0;
-		token_flag = 0;
-	}
+	// // Si hay, entonces fui seleccionado para iniciar una elección y el próximo
+	// // proceso vivo es el que me envío este ACK
+	// if (ack_flag) {
+	// 	siguiente = ack_status.MPI_SOURCE;
+	// 	// Recibo para que sea desencolado
+	// 	MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
+	// 			  MPI_COMM_WORLD, &req);
+	// 	ack_flag = 0;
+	// 	token_flag = 0;
+	// }
 
 	// Repito hasta que haya un líder
 	while (ahora < tiempo_maximo){
@@ -155,7 +161,7 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 					// Si llegó, entonces lo recibo para que sea desencolado
 					else {
 						MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
-								  MPI_COMM_WORLD, &req);
+						          MPI_COMM_WORLD, &req);
 					}
 				}
 				// Ambos flags son resetados para la siguiente iteración
