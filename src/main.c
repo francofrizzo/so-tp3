@@ -29,7 +29,7 @@ static int ab_procesos(t_pid pid, int *es_ultimo)
 	MPI_COMM_WORLD, &status);
 
  if (*es_ultimo)
-	printf("Proceso con PID %u es ahora el 鷏timo.\n", pid);
+	printf("Proceso con PID %u es ahora el 煤ltimo.\n", pid);
 
  return terminar;
 }
@@ -41,7 +41,7 @@ void elector(t_pid pid)
  int empezar;
  MPI_Status status;
 
- /* Inicializo generador de n鷐eros al azar. */
+ /* Inicializo generador de n煤meros al azar. */
  srandom(time(NULL)+rank);
 
  /* Espero a recibir el comando para empezar. */
@@ -61,17 +61,17 @@ void elector(t_pid pid)
 		 break;
 		}
 
-	 printf("Comienza la elecci髇 de l韉er en proceso %u.\n", pid);
-	 /* Etapa 2: corro la elecci髇 de l韉er. */
+	 printf("Comienza la elecci贸n de l铆der en proceso %u.\n", pid);
+	 /* Etapa 2: corro la elecci贸n de l铆der. */
 	 if ((random() % DENOMINADOR_PROB_INICIO)==0)
 		{
-		 printf("Poniendo a circular una elecci髇 en proceso %u.\n",
+		 printf("Poniendo a circular una elecci贸n en proceso %u.\n",
 			pid);
 		 iniciar_eleccion(pid, es_ultimo);
 		}
 
 	 eleccion_lider(pid, es_ultimo, PERIODO_ELECCION);
-	 printf("Finalizada la elecci髇 de l韉er en proceso %u.\n", pid);
+	 printf("Finalizada la elecci贸n de l铆der en proceso %u.\n", pid);
 	}
 }
 
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 	}
  else
 	{
-	 /* Soy un elector m醩. */
+	 /* Soy un elector m谩s. */
 	 elector(rank);
 	}
 

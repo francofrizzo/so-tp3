@@ -5,23 +5,23 @@
 #define TAG_ELECCION_ACK   10
 #define ACK_TIMEOUT        1
 
-/* Enumerado para ver si soy o no l韉er. */
+/* Enumerado para ver si soy o no l铆der. */
 enum status { NO_LIDER, LIDER };
 typedef enum status t_status;
 
-/* PID de elecci髇 de l韉er. */
+/* PID de elecci贸n de l铆der. */
 typedef unsigned short int t_pid;
 #define	MPI_PID	MPI_UNSIGNED_SHORT
 
-/* Funci髇 que maneja la elecci髇 de l韉er por no m醩
+/* Funci贸n que maneja la elecci贸n de l铆der por no m谩s
  * de timeout segundos.
  * pid es el PID del proceso local.
- * es_ultimo indica si 閟te es el 鷏timo proceso del anillo o no.
+ * es_ultimo indica si 茅ste es el 煤ltimo proceso del anillo o no.
  */
 void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout);
 
-/* Funci髇 que se encarga de iniciar la elecci髇 de l韉er.
- * Los par醡etros tienen la misma sem醤tica que eleccion_lider().
+/* Funci贸n que se encarga de iniciar la elecci贸n de l铆der.
+ * Los par谩metros tienen la misma sem谩ntica que eleccion_lider().
  */
 void iniciar_eleccion(t_pid pid, int es_ultimo);
 

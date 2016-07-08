@@ -47,7 +47,7 @@ static int procesar_comandos(unsigned int np)
  if (long_buffer<=1)
 	return 0;
 
- /* Sacamos ˙ltimo caracter. */
+ /* Sacamos √∫ltimo caracter. */
  buffer[long_buffer-1]= '\0';
 
  primer_param= strtok(buffer, " ");
@@ -60,12 +60,12 @@ static int procesar_comandos(unsigned int np)
 	 t_pid quien= atoi(segundo_param);
 	 if (quien>np)
 		{
-		 printf("Hay sÛlo %u procesos.\n", np);
+		 printf("Hay s√≥lo %u procesos.\n", np);
 		 return 0;
 		}
 	 else if (vivos[quien])
 		{
-		 printf("El proceso %u ya est· vivo.\n", quien);
+		 printf("El proceso %u ya est√° vivo.\n", quien);
 		 return 0;
 		}
 	 printf("Lanzando proceso %u.\n", quien);
@@ -77,17 +77,17 @@ static int procesar_comandos(unsigned int np)
 	 t_pid quien= atoi(segundo_param);
 	 if (quien>np)
 		{
-		 printf("Hay sÛlo %u procesos.\n", np);
+		 printf("Hay s√≥lo %u procesos.\n", np);
 		 return 0;
 		}
 	 else if (!vivos[quien])
 		{
-		 printf("El proceso %u no est· vivo.\n", quien);
+		 printf("El proceso %u no est√° vivo.\n", quien);
 		 return 0;
 		}
 	 printf("Matando proceso %u.\n", quien);
-	 vivos[quien]= 0; /* Ya no est· vivo. */
-	 /* Le digo que no es el ˙ltimo y luego que termine. */
+	 vivos[quien]= 0; /* Ya no est√° vivo. */
+	 /* Le digo que no es el √∫ltimo y luego que termine. */
 	 MPI_Send(&pid_0, 1, MPI_PID, quien, TAG_CONTROL, MPI_COMM_WORLD);
 	 MPI_Send(&cte_1, 1, MPI_INT, quien, TAG_CONTROL, MPI_COMM_WORLD);
 	}
@@ -121,7 +121,7 @@ void control(unsigned int np)
 	 exit(1);
 	}
 
- /* Al principio ninguno est· vivo. */
+ /* Al principio ninguno est√° vivo. */
  for (i= 1; i<=np; i++)
 	vivos[i]= 0;
 
