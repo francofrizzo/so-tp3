@@ -19,7 +19,7 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 	t_pid token[2];
 	token[0] = pid;
 	token[1] = pid;
-	// DEBUG
+	// DEBUG (cambiar tamaño de token en inicialización)
 	// token[2] = pid;
 	// token[3] = 0;
 
@@ -45,6 +45,7 @@ void iniciar_eleccion(t_pid pid, int es_ultimo){
 				ahora = MPI_Wtime();
 			}
 
+			// Si llegó un ACK, hago Irecv para desencolarlo
 			if (ack_flag) {
 				MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
 				          MPI_COMM_WORLD, &req);
@@ -80,21 +81,6 @@ void eleccion_lider(t_pid pid, int es_ultimo, unsigned int timeout){
 
 	MPI_Request req;
 	t_pid token[2];
-
-	// // Consulto si hay mensajes en la cola
-	// MPI_Iprobe(MPI_ANY_SOURCE, TAG_ELECCION_ACK, MPI_COMM_WORLD,
-	// 		   &ack_flag, &ack_status);
-
-	// // Si hay, entonces fui seleccionado para iniciar una elección y el próximo
-	// // proceso vivo es el que me envío este ACK
-	// if (ack_flag) {
-	// 	siguiente = ack_status.MPI_SOURCE;
-	// 	// Recibo para que sea desencolado
-	// 	MPI_Irecv(&token_flag, 1, MPI_PID, siguiente, TAG_ELECCION_ACK,
-	// 			  MPI_COMM_WORLD, &req);
-	// 	ack_flag = 0;
-	// 	token_flag = 0;
-	// }
 
 	// Repito hasta que haya un líder
 	while (ahora < tiempo_maximo){
